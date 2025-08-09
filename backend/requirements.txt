@@ -1,0 +1,10 @@
+# == Core framework ==
+Django>=5.2.4
+djangorestframework
+djangorestframework-simplejwt
+django-cors-headers
+django-filter
+python-dotenv
+
+# == Database driver (leave if you’ll use PostgreSQL; otherwise delete) ==
+psycopg2-binary
