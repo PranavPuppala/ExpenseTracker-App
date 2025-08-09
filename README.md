@@ -1,4 +1,4 @@
-Backend Setup (Terminal 1)
+🐍 Backend Setup (Terminal 1)
 1. Navigate to backend directory:
 bashcd backend
 2. Create and activate virtual environment:
@@ -20,7 +20,7 @@ bashpython manage.py runserver
 ✅ Backend is now running on: http://127.0.0.1:8000
 Keep this terminal open and running!
 
- Frontend Setup (Terminal 2)
+⚛️ Frontend Setup (Terminal 2)
 Open a new terminal window/tab and follow these steps:
 1. Navigate to frontend directory:
 bashcd frontend
