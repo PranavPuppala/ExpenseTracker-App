@@ -1,73 +1,32 @@
-🐍 Backend Setup (Terminal 1)
-Navigate to backend directory
-
-bash
-Copy
-Edit
+# 🐍 Backend Setup (Terminal 1)
 cd backend
-Create and activate virtual environment
 
-Create virtual environment:
-
-bash
-Copy
-Edit
 python -m venv .venv
-Activate virtual environment:
 
-Windows:
-
-bash
-Copy
-Edit
+# Activate virtual environment
+# Windows:
 .venv\Scripts\activate
-macOS/Linux:
-
-bash
-Copy
-Edit
+# macOS/Linux:
 source .venv/bin/activate
-Install Python dependencies
 
-bash
-Copy
-Edit
 pip install -r requirements.txt
-Run database migrations
-
-bash
-Copy
-Edit
 python manage.py migrate
-Start the Django development server
-
-bash
-Copy
-Edit
 python manage.py runserver
-✅ Backend is now running at: http://127.0.0.1:8000
-Keep this terminal open and running.
+# ✅ Backend running at: http://127.0.0.1:8000 (keep this terminal open)
 
-⚛️ Frontend Setup (Terminal 2)
-Navigate to frontend directory
-
-bash
-Copy
-Edit
+# ⚛️ Frontend Setup (Terminal 2)
 cd frontend
-Install Node.js dependencies
 
-bash
-Copy
-Edit
 npm install
-Start the React development server
 
-bash
-Copy
-Edit
 npm run dev
-✅ Frontend is now running at: http://localhost:5173
-Keep this terminal open and running.
+# ✅ Frontend running at: http://localhost:5173 (keep this terminal open)
+
+
+
+
+
+
+
 
 
