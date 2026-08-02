@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { Link } from "react-router-dom";
 import { Search, MoreHorizontal, Edit, Trash2, ChevronLeft, ChevronRight } from "lucide-react";
 import { useDebounce } from "use-debounce";
@@ -30,30 +30,29 @@ import {
 import api from "@/lib/api";
 import { CATEGORY_COLORS } from "@/lib/constants";
 
-
 export default function ExpensesPage() {
-  const [allExpenses, setAllExpenses] = useState([]); // Store all expenses
-  const [filteredExpenses, setFilteredExpenses] = useState([]); // Store filtered results
+  // RESULTS from server
+  const [expenses, setExpenses] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [initialLoad, setInitialLoad] = useState(true);
   const [error, setError] = useState("");
-
+  // Pagination (cursor endpoints)
+  const [nextUrl, setNextUrl] = useState(null);
+  const [prevUrl, setPrevUrl] = useState(null);
+  const [count, setCount] = useState(0);
 
   // Filters
   const [searchTerm, setSearchTerm] = useState("");
-  const [debouncedSearchTerm] = useDebounce(searchTerm, 300);
+  const [debouncedSearchTerm] = useDebounce(searchTerm, 800);
   const [selectedCategory, setSelectedCategory] = useState("all");
-  const [selectedDateRange, setSelectedDateRange] = useState("last_7_days");
-
-
-  // Pagination for filtered results
-  const [currentPage, setCurrentPage] = useState(1);
-  const itemsPerPage = 20;
-
+  const [selectedDateRange, setSelectedDateRange] = useState("all"); // Default to "All Time"
 
   // Delete dialog
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [expenseToDelete, setExpenseToDelete] = useState(null);
 
+  // Page size (matches DRF)
+  // const ITEMS_PER_PAGE = 20;
 
   // Categories for filter dropdown
   const categories = [
@@ -69,166 +68,126 @@ export default function ExpensesPage() {
     { value: "OTHER", label: "Other" }
   ];
 
-
   // Date range options
   const dateRanges = [
+    { value: "all", label: "All Time" },
     { value: "last_7_days", label: "Last 7 days" },
     { value: "last_30_days", label: "Last 30 days" },
     { value: "last_year", label: "Last Year" }
   ];
 
-
-  // Load initial data only once
-  useEffect(() => {
-    fetchAllExpenses();
-  }, []);
-
-
-  // Apply filters whenever search term, category, or date range changes
-  useEffect(() => {
-    applyFilters();
-    setCurrentPage(1); // Reset to first page when filters change
-  }, [debouncedSearchTerm, selectedCategory, selectedDateRange, allExpenses]);
-
-
-  const fetchAllExpenses = async () => {
-    try {
-      setLoading(true);
-      setError("");
-
-      let allExpenses = [];
-      let nextUrl = '/api/expenses/';
-      
-      // Keep fetching until no more pages
-      while (nextUrl) {
-        const response = await api.get(nextUrl);
-        const data = response.data;
-        
-        // Add current page results
-        allExpenses = [...allExpenses, ...(data.results || [])];
-        
-        // Get next page URL (cursor pagination)
-        // Remove the base URL if it's included in the next URL
-        nextUrl = data.next;
-        if (nextUrl && nextUrl.includes(api.defaults.baseURL)) {
-          nextUrl = nextUrl.replace(api.defaults.baseURL, '');
+  // Build filters into query params
+  const getFilterParams = useCallback(() => {
+    let params = {};
+    // Search
+    if (debouncedSearchTerm) params.search = debouncedSearchTerm;
+    // Category
+    if (selectedCategory !== "all") params.category = selectedCategory;
+    // Date range
+    const today = new Date();
+    if (selectedDateRange !== "all") {
+      switch (selectedDateRange) {
+        case "last_7_days": {
+          const minDate = new Date(today);
+          minDate.setDate(today.getDate() - 7);
+          params.min_date = minDate.toISOString().substring(0, 10);
+          break;
         }
+        case "last_30_days": {
+          const minDate = new Date(today);
+          minDate.setDate(today.getDate() - 30);
+          params.min_date = minDate.toISOString().substring(0, 10);
+          break;
+        }
+        case "last_year": {
+          const minDate = new Date(today);
+          minDate.setFullYear(today.getFullYear() - 1);
+          params.min_date = minDate.toISOString().substring(0, 10);
+          break;
+        }
+        default:
+          break;
       }
-      
-      setAllExpenses(allExpenses);
+    }
+    return params;
+  }, [debouncedSearchTerm, selectedCategory, selectedDateRange]);
+
+  // Fetch expenses when filter/pagination changes
+  const fetchExpenses = useCallback(async (url = null, customParams = null) => {
+    setLoading(true);
+    setError("");
+    try {
+      let resp;
+      if (url) {
+        resp = await api.get(url);
+      } else {
+        const params = customParams || getFilterParams();
+        resp = await api.get("/api/expenses/", { params });
+      }
+      setExpenses(resp.data.results || []);
+      setNextUrl(resp.data.next || null);
+      setPrevUrl(resp.data.previous || null);
+      setCount(resp.data.count || resp.data.results?.length || 0);
     } catch (err) {
       console.error("Fetch expenses error:", err);
       setError("Failed to load expenses");
     } finally {
       setLoading(false);
+      setInitialLoad(false);
     }
+  }, [getFilterParams]);
+
+  // Fetch when initial load or any filter changes
+  useEffect(() => {
+    fetchExpenses(null, getFilterParams());
+    setDeleteDialogOpen(false);
+    setExpenseToDelete(null);
+  }, [fetchExpenses, getFilterParams]);
+
+  // Pagination handlers
+  const handleNextPage = () => {
+    if (nextUrl) fetchExpenses(nextUrl);
+  };
+  const handlePrevPage = () => {
+    if (prevUrl) fetchExpenses(prevUrl);
   };
 
-
-  const applyFilters = () => {
-    let filtered = [...allExpenses];
-
-
-    // Apply search filter (description only)
-    if (debouncedSearchTerm) {
-      filtered = filtered.filter(expense =>
-        expense.description?.toLowerCase().includes(debouncedSearchTerm.toLowerCase())
-      );
-    }
-
-
-    // Apply category filter
-    if (selectedCategory !== 'all') {
-      filtered = filtered.filter(expense => expense.category === selectedCategory);
-    }
-
-
-    // Apply date range filter
-    const today = new Date();
-    let minDate;
-    
-    switch (selectedDateRange) {
-      case 'last_7_days':
-        minDate = new Date(today);
-        minDate.setDate(today.getDate() - 7);
-        break;
-      case 'last_30_days':
-        minDate = new Date(today);
-        minDate.setDate(today.getDate() - 30);
-        break;
-      case 'last_year':
-        minDate = new Date(today);
-        minDate.setFullYear(today.getFullYear() - 1);
-        break;
-    }
-    
-    if (minDate) {
-      filtered = filtered.filter(expense => {
-        const expenseDate = new Date(expense.date);
-        return expenseDate >= minDate;
-      });
-    }
-
-
-    setFilteredExpenses(filtered);
-  };
-
-
+  // Delete
   const handleDeleteExpense = async () => {
     if (!expenseToDelete) return;
-
-
     try {
       await api.delete(`/api/expenses/${expenseToDelete.id}/`);
       setDeleteDialogOpen(false);
       setExpenseToDelete(null);
-      
-      // Remove from local state instead of refetching
-      setAllExpenses(prev => prev.filter(exp => exp.id !== expenseToDelete.id));
+      fetchExpenses();
     } catch (err) {
       console.error("Delete expense error:", err);
       setError("Failed to delete expense");
     }
   };
 
-
-  // Calculate pagination for filtered results
-  const totalFilteredItems = filteredExpenses.length;
-  const totalPages = Math.ceil(totalFilteredItems / itemsPerPage);
-  const startIndex = (currentPage - 1) * itemsPerPage;
-  const endIndex = startIndex + itemsPerPage;
-  const currentPageExpenses = filteredExpenses.slice(startIndex, endIndex);
-
-
+  // Format
   const formatCurrency = (amount) => {
     return new Intl.NumberFormat('en-US', {
       style: 'currency',
       currency: 'USD'
     }).format(amount || 0);
   };
-
-
   const formatDate = (dateString) => {
-    const date = new Date(dateString);
-    return date.toLocaleDateString('en-US', { 
-      year: 'numeric', 
-      month: 'short', 
-      day: 'numeric' 
+    const [year, month, day] = dateString.split('-');
+    const date = new Date(year, month - 1, day);
+    return date.toLocaleDateString('en-US', {
+      year: 'numeric',
+      month: 'short',
+      day: 'numeric'
     });
   };
-
-
   const getCategoryColor = (category) => {
     return CATEGORY_COLORS[category] || "#ffffff";
   };
-
-
   const getCategoryTextColor = (category) => {
-    // Use black text for light backgrounds (OTHER category)
     return category === "OTHER" ? "#000000" : "#ffffff";
   };
-
-
   const getCategoryDisplayName = (category) => {
     const names = {
       GROCERIES: "Groceries",
@@ -243,8 +202,6 @@ export default function ExpensesPage() {
     };
     return names[category] || category;
   };
-
-
   const getPaymentMethodDisplayName = (method) => {
     const names = {
       DEBIT_CARD: "Debit Card",
@@ -256,15 +213,13 @@ export default function ExpensesPage() {
     return names[method] || method;
   };
 
-
-  if (loading) {
+  if (initialLoad && loading) {
     return (
       <div className="flex items-center justify-center h-64">
         <div className="text-zinc-400">Loading expenses...</div>
       </div>
     );
   }
-
 
   return (
     <div className="space-y-6">
@@ -273,7 +228,6 @@ export default function ExpensesPage() {
         <h1 className="text-2xl font-semibold text-white">All Expenses</h1>
         <p className="text-zinc-400 mt-1">Manage and filter your expense records</p>
       </div>
-
 
       {/* Filters */}
       <div className="flex flex-col sm:flex-row gap-4">
@@ -288,7 +242,6 @@ export default function ExpensesPage() {
           />
         </div>
 
-
         {/* Category Filter */}
         <Select value={selectedCategory} onValueChange={setSelectedCategory}>
           <SelectTrigger className="bg-zinc-800 border-zinc-700 text-white h-12 w-full sm:w-48">
@@ -302,7 +255,6 @@ export default function ExpensesPage() {
             ))}
           </SelectContent>
         </Select>
-
 
         {/* Date Range Filter */}
         <Select value={selectedDateRange} onValueChange={setSelectedDateRange}>
@@ -319,14 +271,12 @@ export default function ExpensesPage() {
         </Select>
       </div>
 
-
       {/* Error Message */}
       {error && (
         <div className="text-red-400 text-sm">
           {error}
         </div>
       )}
-
 
       {/* Expenses Table */}
       <div className="bg-zinc-800 border border-zinc-700 rounded-lg overflow-hidden">
@@ -340,11 +290,10 @@ export default function ExpensesPage() {
           <div className="col-span-1"></div>
         </div>
 
-
         {/* Table Body */}
         <div className="divide-y divide-zinc-700">
-          {currentPageExpenses.length > 0 ? (
-            currentPageExpenses.map((expense) => (
+          {expenses.length > 0 ? (
+            expenses.map((expense) => (
               <div key={expense.id} className="grid grid-cols-12 gap-4 p-4 hover:bg-zinc-700/50 transition-colors">
                 <div className="col-span-3 text-white font-medium">
                   {expense.description || "No description"}
@@ -400,7 +349,7 @@ export default function ExpensesPage() {
             ))
           ) : (
             <div className="p-8 text-center text-zinc-400">
-              {debouncedSearchTerm || selectedCategory !== 'all' ? 
+              {debouncedSearchTerm || selectedCategory !== 'all' || selectedDateRange !== 'all' ? 
                 'No expenses match your filters' : 
                 'No expenses found'
               }
@@ -409,41 +358,34 @@ export default function ExpensesPage() {
         </div>
       </div>
 
-
-      {/* Pagination */}
-      {totalPages > 1 && (
-        <div className="flex items-center justify-between">
+      {/* Pagination (only show if at least one page exists) */}
+      {(prevUrl || nextUrl) && (
+        <div className="flex items-center justify-between mt-4">
           <div className="text-sm text-zinc-400">
-            Showing {startIndex + 1} to {Math.min(endIndex, totalFilteredItems)} of {totalFilteredItems} expenses
+            Showing {expenses.length > 0 ? 1 : 0} to {expenses.length} of {count} expenses
           </div>
           <div className="flex items-center space-x-2">
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
-              disabled={currentPage === 1}
-              className="border-zinc-600 text-zinc-300 hover:bg-zinc-800"
-            >
-              <ChevronLeft className="h-4 w-4 mr-1" />
-              Previous
-            </Button>
-            <span className="text-zinc-400 text-sm">
-              Page {currentPage} of {totalPages}
-            </span>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}
-              disabled={currentPage === totalPages}
-              className="border-zinc-600 text-zinc-300 hover:bg-zinc-800"
-            >
-              Next
-              <ChevronRight className="h-4 w-4 ml-1" />
-            </Button>
+            {prevUrl && (
+              <Button
+                onClick={handlePrevPage}
+                className="bg-zinc-700 hover:bg-zinc-600 text-white px-3 py-1 rounded-lg transition"
+              >
+                <ChevronLeft className="h-4 w-4 mr-1" />
+                Previous
+              </Button>
+            )}
+            {nextUrl && (
+              <Button
+                onClick={handleNextPage}
+                className="bg-zinc-700 hover:bg-zinc-600 text-white px-3 py-1 rounded-lg transition"
+              >
+                Next
+                <ChevronRight className="h-4 w-4 ml-1" />
+              </Button>
+            )}
           </div>
         </div>
       )}
-
 
       {/* Delete Confirmation Dialog */}
       <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
@@ -464,7 +406,7 @@ export default function ExpensesPage() {
             >
               Delete
             </AlertDialogAction>
-            </AlertDialogFooter>
+          </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
     </div>

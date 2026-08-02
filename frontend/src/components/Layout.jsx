@@ -122,7 +122,7 @@ export default function Layout() {
                 onClick={logout}
                 variant="ghost"
                 size="sm"
-                className="text-zinc-300 hover:text-white hover:bg-zinc-800"
+                className="text-zinc-300 hover:text-white hover:bg-zinc-700"
               >
                 <LogOut size={16} className="mr-2" />
                 Logout

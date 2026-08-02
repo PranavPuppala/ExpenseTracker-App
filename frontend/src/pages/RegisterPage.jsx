@@ -18,35 +18,50 @@ import { useAuth } from "@/lib/useAuth";
 
 export default function RegisterPage() {
   /* -------------------- form state -------------------- */
-  const [first, setFirst] = useState("");
-  const [last, setLast] = useState("");
-  const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
-  const [confPwd, setConfPwd] = useState("");
-  const [showPwd, setShowPwd] = useState(false);
-  const [showConf, setShowConf] = useState(false);
+  const [formData, setFormData] = useState({
+    first_name: "",
+    last_name: "",
+    email: "",
+    password: "",
+    confirm_password: ""
+  });
+  
+  const [showPasswords, setShowPasswords] = useState({
+    password: false,
+    confirmPassword: false
+  });
+  
   const [error, setError] = useState("");
 
   /* -------------------- helpers -------------------- */
   const { setUser } = useAuth();
   const navigate = useNavigate();
 
+  const handleChange = (e) => {
+    const { name, value } = e.target;
+    setFormData(prev => ({
+      ...prev,
+      [name]: value
+    }));
+  };
+
+  const togglePasswordVisibility = (field) => {
+    setShowPasswords(prev => ({
+      ...prev,
+      [field]: !prev[field]
+    }));
+  };
+
   async function handleSubmit(e) {
     e.preventDefault();
 
-    if (password !== confPwd) {
+    if (formData.password !== formData.confirm_password) {
       setError("Passwords do not match");
       return;
     }
 
     try {
-      const { data } = await api.post("/api/register/", {
-        first_name: first,
-        last_name: last,
-        email,
-        password,
-        confirm_password: confPwd,
-      });
+      const { data } = await api.post("/api/users/register/", formData);
 
       /* backend returns { access, refresh, user } */
       localStorage.setItem(ACCESS_TOKEN, data.access);
@@ -95,13 +110,14 @@ export default function RegisterPage() {
             {/* names grid */}
             <div className="grid md:grid-cols-2 gap-4">
               <div className="grid gap-2">
-                <Label htmlFor="first" className="text-white font-medium">
+                <Label htmlFor="first_name" className="text-white font-medium">
                   First Name
                 </Label>
                 <Input
-                  id="first"
-                  value={first}
-                  onChange={(e) => setFirst(e.target.value)}
+                  id="first_name"
+                  name="first_name"
+                  value={formData.first_name}
+                  onChange={handleChange}
                   required
                   placeholder="John"
                   className="bg-zinc-800 border-zinc-700 text-white placeholder:text-zinc-500 h-10"
@@ -109,13 +125,14 @@ export default function RegisterPage() {
               </div>
 
               <div className="grid gap-2">
-                <Label htmlFor="last" className="text-white font-medium">
+                <Label htmlFor="last_name" className="text-white font-medium">
                   Last Name
                 </Label>
                 <Input
-                  id="last"
-                  value={last}
-                  onChange={(e) => setLast(e.target.value)}
+                  id="last_name"
+                  name="last_name"
+                  value={formData.last_name}
+                  onChange={handleChange}
                   required
                   placeholder="Doe"
                   className="bg-zinc-800 border-zinc-700 text-white placeholder:text-zinc-500 h-10"
@@ -130,9 +147,10 @@ export default function RegisterPage() {
               </Label>
               <Input
                 id="email"
+                name="email"
                 type="email"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
+                value={formData.email}
+                onChange={handleChange}
                 required
                 placeholder="john.doe@example.com"
                 className="bg-zinc-800 border-zinc-700 text-white placeholder:text-zinc-500 h-10"
@@ -147,9 +165,10 @@ export default function RegisterPage() {
               <div className="relative">
                 <Input
                   id="password"
-                  type={showPwd ? "text" : "password"}
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
+                  name="password"
+                  type={showPasswords.password ? "text" : "password"}
+                  value={formData.password}
+                  onChange={handleChange}
                   required
                   placeholder="••••••••"
                   className="bg-zinc-800 border-zinc-700 text-white placeholder:text-zinc-500 h-10 pr-10"
@@ -158,10 +177,10 @@ export default function RegisterPage() {
                   type="button"
                   size="icon"
                   variant="ghost"
-                  onClick={() => setShowPwd(!showPwd)}
+                  onClick={() => togglePasswordVisibility('password')}
                   className="absolute inset-y-0 right-0 h-10 w-10 hover:bg-transparent"
                 >
-                  {showPwd ? (
+                  {showPasswords.password ? (
                     <EyeOff size={16} className="text-zinc-400" />
                   ) : (
                     <Eye size={16} className="text-zinc-400" />
@@ -172,15 +191,16 @@ export default function RegisterPage() {
 
             {/* confirm password */}
             <div className="grid gap-2">
-              <Label htmlFor="conf" className="text-white font-medium">
+              <Label htmlFor="confirm_password" className="text-white font-medium">
                 Confirm Password
               </Label>
               <div className="relative">
                 <Input
-                  id="conf"
-                  type={showConf ? "text" : "password"}
-                  value={confPwd}
-                  onChange={(e) => setConfPwd(e.target.value)}
+                  id="confirm_password"
+                  name="confirm_password"
+                  type={showPasswords.confirmPassword ? "text" : "password"}
+                  value={formData.confirm_password}
+                  onChange={handleChange}
                   required
                   placeholder="••••••••"
                   className="bg-zinc-800 border-zinc-700 text-white placeholder:text-zinc-500 h-10 pr-10"
@@ -189,10 +209,10 @@ export default function RegisterPage() {
                   type="button"
                   size="icon"
                   variant="ghost"
-                  onClick={() => setShowConf(!showConf)}
+                  onClick={() => togglePasswordVisibility('confirmPassword')}
                   className="absolute inset-y-0 right-0 h-10 w-10 hover:bg-transparent"
                 >
-                  {showConf ? (
+                  {showPasswords.confirmPassword ? (
                     <EyeOff size={16} className="text-zinc-400" />
                   ) : (
                     <Eye size={16} className="text-zinc-400" />
@@ -226,4 +246,3 @@ export default function RegisterPage() {
     </div>
   );
 }
-

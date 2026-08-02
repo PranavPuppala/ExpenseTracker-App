@@ -74,7 +74,7 @@ export default function SettingsPage() {
     setProfileSuccess("");
 
     try {
-      const response = await api.put("/api/profile/", {
+      const response = await api.patch("/api/users/profile/", {
         first_name: profileData.first_name,
         last_name: profileData.last_name
       });
@@ -110,7 +110,7 @@ export default function SettingsPage() {
     }
 
     try {
-      await api.put("/api/change-password/", {
+      await api.put("/api/users/change-password/", {
         old_password: passwordData.old_password,
         new_password: passwordData.new_password,
         confirm_password: passwordData.confirm_password
@@ -145,7 +145,7 @@ export default function SettingsPage() {
   // Handle account deletion
   const handleDeleteAccount = async () => {
     try {
-      await api.delete("/api/profile/");
+      await api.delete("/api/users/profile/");
       logout(); // This will redirect to login
     } catch (err) {
       console.error("Delete account error:", err);

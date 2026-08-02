@@ -8,7 +8,15 @@ import {
   TrendingUp,
   TrendingDown
 } from "lucide-react";
-import { LineChart, Line, XAxis, YAxis, ResponsiveContainer } from 'recharts';
+import { 
+  LineChart, 
+  Line, 
+  XAxis, 
+  YAxis, 
+  CartesianGrid,
+  Tooltip,
+  ResponsiveContainer 
+} from 'recharts';
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import api from "@/lib/api";
 import { CATEGORY_COLORS } from "@/lib/constants";
@@ -21,36 +29,30 @@ export default function DashboardPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   
-  const { user, loading: authLoading } = useAuth();
+  const { loading: authLoading } = useAuth();
 
   useEffect(() => {
-    if (!authLoading && user) {
+    if (!authLoading) {
       fetchDashboardData();
-    } else if (!authLoading && !user) {
-      setError("Please log in to view dashboard");
-      setLoading(false);
     }
-  }, [user, authLoading]);
+  }, [authLoading]);
 
   const fetchDashboardData = async () => {
     try {
       setLoading(true);
       setError("");
       
-      // Fetch all dashboard data in parallel
       const [dashboardRes, recentRes, chartRes] = await Promise.all([
-        api.get("/api/expenses/dashboard"),
-        api.get("/api/expenses/recent"),
-        api.get("/api/expenses/series/daily?days=30")
+        api.get("/api/expenses/dashboard/"),
+        api.get("/api/expenses/recent/"),
+        api.get("/api/expenses/series/daily/?days=30")
       ]);
 
       setDashboardData(dashboardRes.data);
       setRecentExpenses(recentRes.data);
       setChartData(chartRes.data);
     } catch (err) {
-      if (err.response?.status === 401) {
-        setError("Session expired. Please login again.");
-      } else if (err.response?.status === 404) {
+      if (err.response?.status === 404) {
         setError("Dashboard endpoints not found. Check backend configuration.");
       } else if (err.code === 'ECONNREFUSED' || err.message.includes('Network Error')) {
         setError("Cannot connect to server. Is the backend running?");
@@ -76,9 +78,8 @@ export default function DashboardPage() {
   };
 
   const getRelativeTime = (dateString) => {
-    // Parse the date string properly to avoid timezone issues
     const [year, month, day] = dateString.split('-');
-    const expenseDate = new Date(year, month - 1, day); // month is 0-indexed
+    const expenseDate = new Date(year, month - 1, day);
     
     const today = new Date();
     const todayDateOnly = new Date(today.getFullYear(), today.getMonth(), today.getDate());
@@ -106,7 +107,6 @@ export default function DashboardPage() {
   };
 
   const getCategoryTextColor = (category) => {
-    // Use black text for light backgrounds (OTHER category)
     return category === "OTHER" ? "#000000" : "#ffffff";
   };
 
@@ -125,6 +125,20 @@ export default function DashboardPage() {
     return names[category] || category;
   };
 
+  const CustomTooltip = ({ active, payload, label }) => {
+    if (active && payload && payload.length) {
+      return (
+        <div className="bg-zinc-700 border border-zinc-600 rounded-lg p-3 shadow-lg">
+          <p className="text-zinc-400 text-xs mb-1">{label}</p>
+          <p className="text-white font-semibold text-sm">
+            {formatCurrency(payload[0].value)}
+          </p>
+        </div>
+      );
+    }
+    return null;
+  };
+
   if (loading) {
     return (
       <div className="flex items-center justify-center h-64">
@@ -137,14 +151,6 @@ export default function DashboardPage() {
     return (
       <div className="flex flex-col items-center justify-center h-64 space-y-4">
         <div className="text-red-400 text-center">{error}</div>
-        {error.includes("login") && (
-          <Link 
-            to="/login"
-            className="px-4 py-2 bg-white text-black rounded hover:bg-zinc-200 transition-colors"
-          >
-            Go to Login
-          </Link>
-        )}
         <button
           onClick={fetchDashboardData}
           className="px-4 py-2 bg-zinc-700 text-white rounded hover:bg-zinc-600 transition-colors"
@@ -201,7 +207,7 @@ export default function DashboardPage() {
               {formatCurrency(dashboardData?.monthly_average)}
             </div>
             <p className="text-xs text-zinc-400">
-              {dashboardData?.active_categories_count || 0} active categories
+              {dashboardData?.active_categories_count || 0} active categories for the month
             </p>
           </CardContent>
         </Card>
@@ -222,7 +228,7 @@ export default function DashboardPage() {
               }
             </div>
             <p className="text-xs text-zinc-400">
-              {dashboardData?.top_category_percentage || 0}% of total expenses
+              {dashboardData?.top_category_percentage || 0}% of total expenses for the month
             </p>
           </CardContent>
         </Card>
@@ -237,20 +243,35 @@ export default function DashboardPage() {
             <p className="text-sm text-zinc-400">Your expense trends for the past 30 days</p>
           </CardHeader>
           <CardContent>
-            {chartData.length > 0 ? (
+            {chartData.every(d => d.total === 0) ? (
+              <div className="flex items-center justify-center h-[300px] text-zinc-400">
+                You have no expenses in the past 30 days
+              </div>
+            ) : (
               <ResponsiveContainer width="100%" height={300}>
                 <LineChart data={chartData}>
+                  <CartesianGrid 
+                    strokeDasharray="3 3" 
+                    stroke="#3f3f46"
+                    vertical={false}
+                  />
                   <XAxis 
                     dataKey="day" 
                     axisLine={false}
                     tickLine={false}
-                    tick={{ fill: '#a1a1aa', fontSize: 12 }}
+                    tick={{ fill: '#a1a1aa', fontSize: 11 }}
+                    interval={4}
                   />
                   <YAxis 
                     axisLine={false}
                     tickLine={false}
-                    tick={{ fill: '#a1a1aa', fontSize: 12 }}
+                    tick={{ fill: '#a1a1aa', fontSize: 11 }}
                     tickFormatter={(value) => `$${value}`}
+                    width={60}
+                  />
+                  <Tooltip
+                    content={<CustomTooltip />}
+                    cursor={{ stroke: '#52525b', strokeWidth: 1 }}
                   />
                   <Line 
                     type="monotone" 
@@ -258,14 +279,10 @@ export default function DashboardPage() {
                     stroke="#2563eb" 
                     strokeWidth={2}
                     dot={false}
-                    activeDot={{ r: 4, fill: "#2563eb" }}
+                    activeDot={{ r: 5, fill: "#2563eb", stroke: "#1d4ed8", strokeWidth: 2 }}
                   />
                 </LineChart>
               </ResponsiveContainer>
-            ) : (
-              <div className="flex items-center justify-center h-[300px] text-zinc-400">
-                No data available
-              </div>
             )}
           </CardContent>
         </Card>
@@ -283,7 +300,6 @@ export default function DashboardPage() {
               <>
                 {recentExpenses.map((expense) => (
                   <div key={expense.id} className="flex items-center space-x-3">
-                    {/* Category Avatar */}
                     <div 
                       className="w-10 h-10 rounded-full flex items-center justify-center text-sm font-medium"
                       style={{ 
@@ -294,7 +310,6 @@ export default function DashboardPage() {
                       {getCategoryInitial(expense.category)}
                     </div>
                     
-                    {/* Expense Details */}
                     <div className="flex-1 min-w-0">
                       <p className="text-sm font-medium text-white truncate">
                         {expense.description || "No description"}
@@ -315,14 +330,12 @@ export default function DashboardPage() {
                       </div>
                     </div>
                     
-                    {/* Amount */}
                     <div className="text-sm font-medium text-white">
                       {formatCurrency(expense.amount)}
                     </div>
                   </div>
                 ))}
                 
-                {/* View All Link */}
                 <Link 
                   to="/expenses"
                   className="flex items-center justify-center space-x-1 text-sm text-zinc-400 hover:text-white transition-colors pt-2"

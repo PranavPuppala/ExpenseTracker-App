@@ -64,15 +64,6 @@ export default function ExpenseFormPage() {
 
   // Load expense data if editing
   useEffect(() => {
-    // Debug date calculation
-    const today = new Date();
-    console.log("=== DATE DEBUG ===");
-    console.log("Current date object:", today);
-    console.log("getFullYear():", today.getFullYear());
-    console.log("getMonth() + 1:", today.getMonth() + 1);
-    console.log("getDate():", today.getDate());
-    console.log("getTodaysDate():", getTodaysDate());
-    console.log("Expected: 2025-08-08");
     
     if (isEditing) {
       fetchExpense();
@@ -96,8 +87,13 @@ export default function ExpenseFormPage() {
     e.preventDefault();
     
     // Validate required fields
-    if (!formData.amount || !formData.category || !formData.payment_method) {
+    if (!formData.amount || !formData.category || !formData.payment_method || !formData.description) {
       setError("Please fill in all required fields");
+      return;
+    }
+
+    if (parseFloat(formData.amount) <= 0) {
+      setError("Amount must be greater than 0");
       return;
     }
 
@@ -121,7 +117,13 @@ export default function ExpenseFormPage() {
 
       navigate("/expenses");
     } catch (err) {
-      setError("Failed to save expense");
+      const backendErrors = err.response?.data;
+      if (backendErrors && typeof backendErrors === "object") {
+        const firstError = Object.values(backendErrors)[0];
+        setError(Array.isArray(firstError) ? firstError[0] : String(firstError));
+      } else {
+        setError("Failed to save expense");
+      }
       console.error("Save expense error:", err);
     } finally {
       setLoading(false);
@@ -184,6 +186,7 @@ export default function ExpenseFormPage() {
                 <Input
                   id="amount"
                   type="number"
+                  step = "any"
                   min="0"
                   placeholder="0.00"
                   value={formData.amount}
@@ -259,6 +262,7 @@ export default function ExpenseFormPage() {
                 placeholder="Enter expense details"
                 value={formData.description}
                 onChange={(e) => handleInputChange("description", e.target.value)}
+                required
                 className="bg-zinc-900 border-zinc-700 text-white placeholder:text-zinc-500 min-h-[100px] resize-none"
               />
             </div>
@@ -284,7 +288,7 @@ export default function ExpenseFormPage() {
                 type="button"
                 variant="outline"
                 onClick={handleCancel}
-                className="border-zinc-600 text-zinc-300 hover:bg-zinc-800 hover:text-white flex-1 h-12"
+                className="border-zinc-600 text-black hover:bg-zinc-800 hover:text-white flex-1 h-12"
               >
                 Cancel
               </Button>

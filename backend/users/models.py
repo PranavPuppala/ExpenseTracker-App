@@ -6,6 +6,9 @@ from django.db import models
 class User(AbstractUser):
     email = models.EmailField(unique=True)
 
+    USERNAME_FIELD = "email"
+    REQUIRED_FIELDS = []
+
     @property
     def full_name(self) -> str:
         """Return first + last name, gracefully handling blanks."""

@@ -30,10 +30,10 @@ export default function LoginPage() {
   const from          = location.state?.from?.pathname || "/dashboard";
 
   /* handle submit */
-  async function handleSubmit(e) {
+  const handleSubmit = async (e) => {
     e.preventDefault();
     try {
-      const { data } = await api.post("/api/login/", { email, password });
+      const { data } = await api.post("/api/users/login/", { email, password });
       localStorage.setItem(ACCESS_TOKEN,  data.access);
       localStorage.setItem(REFRESH_TOKEN, data.refresh);
       setUser(data.user);
@@ -41,7 +41,7 @@ export default function LoginPage() {
     } catch {
       setError("Invalid email or password");
     }
-  }
+  };
 
   /* UI */
   return (
@@ -99,7 +99,7 @@ export default function LoginPage() {
                   type="button"
                   size="icon"
                   variant="ghost"
-                  onClick={() => setShowPwd(!showPwd)}
+                  onClick={() => setShowPwd(prev => !prev)}
                   className="absolute inset-y-0 right-0 h-12 w-12 hover:bg-transparent"
                 >
                   {showPwd ? (
